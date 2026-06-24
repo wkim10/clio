@@ -25,14 +25,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # pydantic models to define the shape of request and response JSON
 # FastAPI will automatically validate incoming requests against these models
 
+class Message(BaseModel):
+    """A single message in the conversation - either from the user or Clio."""
+    role: str
+    content: str
+
 class QueryRequest(BaseModel):
     """What the frontend sends -> a single question string"""
     question: str
+    history: list[Message] = []
 
 class QueryResponse(BaseModel):
     """What we send back -> the generated answer and list of source file paths"""
     answer: str
     sources: list[str]
+    history: list[Message]
 
 @app.get("/")
 def root():
@@ -45,11 +52,12 @@ def query(request: QueryRequest):
     Main RAG endpoint -> the full retrieval and generation pipeline in one request.
 
     Flow:
-    1. Receive question from frontend
+    1. Receive question and conversation history from frontend
     2. Query ChromaDB for the most semantically similar chunks
-    3. Build a prompt combining the retrieved context and the question
-    4. Send to Claude to generate a grounded answer
-    5. Return the answer and source file paths to the frontend
+    3. Build a system prompt combining Clio's instructions and retrieved context
+    4. Build the messages array from conversation history + new question
+    5. Send to Claude to generate a grounded, history-aware answer
+    6. Append new exchange to history and return everything to the frontend
     """
 
     # step 1 -> RETRIEVE
@@ -60,33 +68,50 @@ def query(request: QueryRequest):
         n_results=5
     )
     
-    # join retrieved chunks into a single context string for the prompt
+    # join retrieved chunks into a single context string for the system prompt
     context = "\n\n".join(results["documents"][0])
 
     # deduplicate source file paths -> multiple chunks may come from the same file
     sources = list(set(r["source"] for r in results["metadatas"][0]))
 
-    # step 2 -> GENERATE
-    # instruct Claude to answer using only the retrieved context
-    prompt = f"""You are Clio, a personal history research assistant.
-Answer the question based on the context provided from the user's personal history notes and documents.
+    # step 2 -> BUILD SYSTEM PROMPT
+    # the system prompt contains Clio's instructions and the retrieved context
+    # it's separate from the messages array so conversation history stays clean
+    system_prompt = f"""You are Clio, a personal history research assistant.
+Answer questions based on the context provided from the user's personal history notes and documents.
+If the answer is not in the context, say so honestly.
 
-Context:
-{context}
-
-Question: {request.question}
-
-Answer thoughtfully and cite which sources you drew from."""
+Context from knowledge base:
+{context}"""
     
-    # call Claude Haiku
+    # step 3 -> BUILD MESSAGES ARRAY
+    # convert history to the format Claude expects, then append the new question
+    # passing full history gives Claude memory of the entire conversation
+    messages = [{"role": m.role, "content": m.content} for m in request.history]
+    messages.append({"role": "user", "content": request.question})
+    
+    # step 4 -> GENERATE
+    # call Claude Haiku with the system prompt and full conversation history
     response = anthropic_client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
+        system=system_prompt,
+        messages=messages
     )
 
-    # return the answer text and source list to the frontend
+    answer = response.content[0].text
+
+    # step 5 -> UPDATE HISTORY
+    # append the new user question and Clio's answer to the history
+    # this updated history is returned to the frontend and sent back on the next request
+    updated_history = list(request.history) + [
+        Message(role="user", content=request.question),
+        Message(role="assistant", content=answer)
+    ]
+
+    # return the answer, sources, and updated history to the frontend
     return QueryResponse(
-        answer=response.content[0].text,
-        sources=sources
+        answer=answer,
+        sources=sources,
+        history=updated_history
     )

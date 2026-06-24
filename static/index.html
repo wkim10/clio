@@ -151,6 +151,23 @@
       <button onclick="ask()" id="askBtn">Ask</button>
     </div>
 
+    <button
+      onclick="newConversation()"
+      id="newBtn"
+      style="
+        margin-top: 12px;
+        padding: 8px 16px;
+        background: transparent;
+        color: #888;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      "
+    >
+      New Conversation
+    </button>
+
     <div class="loading" id="loading">Thinking...</div>
 
     <div class="response-container" id="response">
@@ -162,6 +179,8 @@
     </div>
 
     <script>
+      let conversationHistory = [];
+
       async function ask() {
         const question = document.getElementById("question").value.trim();
         if (!question) return;
@@ -175,10 +194,12 @@
           const res = await fetch("/query", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question }),
+            body: JSON.stringify({ question, history: conversationHistory }),
           });
 
           const data = await res.json();
+
+          conversationHistory = data.history;
 
           // display answer
           document.getElementById("answer").textContent = data.answer;
@@ -202,6 +223,13 @@
           document.getElementById("loading").style.display = "none";
           document.getElementById("askBtn").disabled = false;
         }
+      }
+
+      function newConversation() {
+        conversationHistory = [];
+        document.getElementById("question").value = "";
+        document.getElementById("response").style.display = "none";
+        document.getElementById("loading").style.display = "none";
       }
     </script>
   </body>
