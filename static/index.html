@@ -25,7 +25,7 @@
 
       header {
         text-align: center;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
       }
 
       header h1 {
@@ -40,9 +40,122 @@
         font-style: italic;
       }
 
-      .search-container {
+      .chat-container {
         width: 100%;
         max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .message {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .message-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #888;
+      }
+
+      .message-bubble {
+        padding: 16px 20px;
+        border-radius: 12px;
+        line-height: 1.7;
+      }
+
+      .user-message .message-label {
+        text-align: right;
+      }
+
+      .user-message .message-bubble {
+        background: #1a1a1a;
+        color: white;
+        align-self: flex-end;
+        max-width: 85%;
+      }
+
+      .clio-message .message-bubble {
+        background: white;
+        border: 1px solid #ddd;
+        align-self: flex-start;
+      }
+
+      .clio-message .message-bubble h1,
+      .clio-message .message-bubble h2,
+      .clio-message .message-bubble h3 {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .clio-message .message-bubble h1 {
+        font-size: 1.4rem;
+      }
+      .clio-message .message-bubble h2 {
+        font-size: 1.2rem;
+      }
+      .clio-message .message-bubble h3 {
+        font-size: 1rem;
+      }
+
+      .clio-message .message-bubble p {
+        margin-bottom: 12px;
+      }
+
+      .clio-message .message-bubble ul,
+      .clio-message .message-bubble ol {
+        margin-left: 20px;
+        margin-bottom: 12px;
+      }
+
+      .clio-message .message-bubble li {
+        margin-bottom: 4px;
+      }
+
+      .clio-message .message-bubble strong {
+        font-weight: 600;
+      }
+
+      .sources {
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: #888;
+      }
+
+      .sources span {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .sources ul {
+        list-style: none;
+        margin-top: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .sources li {
+        font-family: monospace;
+        font-size: 0.78rem;
+      }
+
+      .input-container {
+        width: 100%;
+        max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .input-row {
         display: flex;
         gap: 12px;
       }
@@ -62,7 +175,7 @@
         border-color: #888;
       }
 
-      button {
+      .ask-btn {
         padding: 14px 24px;
         background: #1a1a1a;
         color: white;
@@ -74,100 +187,35 @@
         white-space: nowrap;
       }
 
-      button:hover {
+      .ask-btn:hover {
         background: #333;
       }
-
-      button:disabled {
+      .ask-btn:disabled {
         background: #999;
         cursor: not-allowed;
       }
 
-      .response-container {
-        width: 100%;
-        max-width: 720px;
-        margin-top: 32px;
-        display: none;
-      }
-
-      .answer-box {
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 24px;
-        line-height: 1.7;
-      }
-
-      .sources-box {
-        margin-top: 16px;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 16px 24px;
-      }
-
-      .sources-box h3 {
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+      .new-btn {
+        align-self: center;
+        padding: 8px 16px;
+        background: transparent;
         color: #888;
-        margin-bottom: 10px;
-      }
-
-      .sources-box ul {
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .sources-box li {
+        border: 1px solid #ddd;
+        border-radius: 8px;
         font-size: 0.85rem;
-        color: #555;
-        font-family: monospace;
+        cursor: pointer;
+      }
+
+      .new-btn:hover {
+        background: #eee;
       }
 
       .loading {
         text-align: center;
         color: #888;
-        margin-top: 32px;
+        font-size: 0.9rem;
+        padding: 8px;
         display: none;
-      }
-
-      .answer-box h1,
-      .answer-box h2,
-      .answer-box h3 {
-        margin-top: 16px;
-        margin-bottom: 8px;
-        font-weight: 600;
-      }
-
-      .answer-box h1 {
-        font-size: 1.4rem;
-      }
-      .answer-box h2 {
-        font-size: 1.2rem;
-      }
-      .answer-box h3 {
-        font-size: 1rem;
-      }
-
-      .answer-box p {
-        margin-bottom: 12px;
-      }
-
-      .answer-box ul,
-      .answer-box ol {
-        margin-left: 20px;
-        margin-bottom: 12px;
-      }
-
-      .answer-box li {
-        margin-bottom: 4px;
-      }
-
-      .answer-box strong {
-        font-weight: 600;
       }
     </style>
   </head>
@@ -177,53 +225,70 @@
       <p>Your personal history research assistant</p>
     </header>
 
-    <div class="search-container">
-      <input
-        type="text"
-        id="question"
-        placeholder="Ask a history question..."
-        onkeydown="if (event.key === 'Enter') ask();"
-      />
-      <button onclick="ask()" id="askBtn">Ask</button>
-    </div>
-
-    <button
-      onclick="newConversation()"
-      id="newBtn"
-      style="
-        margin-top: 12px;
-        padding: 8px 16px;
-        background: transparent;
-        color: #888;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        cursor: pointer;
-      "
-    >
-      New Conversation
-    </button>
+    <div class="chat-container" id="chat"></div>
 
     <div class="loading" id="loading">Thinking...</div>
 
-    <div class="response-container" id="response">
-      <div class="answer-box" id="answer"></div>
-      <div class="sources-box">
-        <h3>Sources</h3>
-        <ul id="sources"></ul>
+    <div class="input-container">
+      <div class="input-row">
+        <input
+          type="text"
+          id="question"
+          placeholder="Ask a history question..."
+          onkeydown="if (event.key === 'Enter') ask();"
+        />
+        <button class="ask-btn" onclick="ask()" id="askBtn">Ask</button>
       </div>
+      <button class="new-btn" onclick="newConversation()">
+        New Conversation
+      </button>
     </div>
 
     <script>
       let conversationHistory = [];
 
+      function appendMessage(role, content, sources = []) {
+        const chat = document.getElementById("chat");
+
+        const message = document.createElement("div");
+        message.className = `message ${role === "user" ? "user-message" : "clio-message"}`;
+
+        const label = document.createElement("div");
+        label.className = "message-label";
+        label.textContent = role === "user" ? "You" : "Clio";
+
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble";
+
+        if (role === "user") {
+          bubble.textContent = content;
+        } else {
+          bubble.innerHTML = marked.parse(content);
+        }
+
+        message.appendChild(label);
+        message.appendChild(bubble);
+
+        if (sources.length > 0) {
+          const sourcesDiv = document.createElement("div");
+          sourcesDiv.className = "sources";
+          sourcesDiv.innerHTML = `<span>Sources</span><ul>${sources.map((s) => `<li>${s.split("/").pop()}</li>`).join("")}</ul>`;
+          message.appendChild(sourcesDiv);
+        }
+
+        chat.appendChild(message);
+        chat.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+
       async function ask() {
         const question = document.getElementById("question").value.trim();
         if (!question) return;
 
-        // show loading, hide previous response
+        // show user message immediately
+        appendMessage("user", question);
+        document.getElementById("question").value = "";
+
         document.getElementById("loading").style.display = "block";
-        document.getElementById("response").style.display = "none";
         document.getElementById("askBtn").disabled = true;
 
         try {
@@ -234,29 +299,11 @@
           });
 
           const data = await res.json();
-
           conversationHistory = data.history;
 
-          // display answer
-          document.getElementById("answer").innerHTML = marked.parse(
-            data.answer,
-          );
-
-          // display sources
-          const sourcesList = document.getElementById("sources");
-          sourcesList.innerHTML = "";
-          data.sources.forEach((source) => {
-            const li = document.createElement("li");
-            // clean up the file path to just show the filename
-            li.textContent = source.split("/").pop();
-            sourcesList.appendChild(li);
-          });
-
-          document.getElementById("response").style.display = "block";
+          appendMessage("assistant", data.answer, data.sources);
         } catch (err) {
-          document.getElementById("answer").textContent =
-            "Error: " + err.message;
-          document.getElementById("response").style.display = "block";
+          appendMessage("assistant", "Error: " + err.message);
         } finally {
           document.getElementById("loading").style.display = "none";
           document.getElementById("askBtn").disabled = false;
@@ -266,8 +313,7 @@
       function newConversation() {
         conversationHistory = [];
         document.getElementById("question").value = "";
-        document.getElementById("response").style.display = "none";
-        document.getElementById("loading").style.display = "none";
+        document.getElementById("chat").innerHTML = "";
       }
     </script>
   </body>
