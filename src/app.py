@@ -2,9 +2,10 @@ import chromadb
 import anthropic
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import json
 
 # load environment variables from .env file
 load_dotenv()
@@ -128,3 +129,66 @@ Context from knowledge base:
         sources=sources,
         history=updated_history
     )
+
+@app.post("/stream")
+async def stream(request: QueryRequest):
+    """
+    Streaming RAG endpoint -> sends response tokens as they are generated
+    instead of waiting for the full response.
+    """
+
+    # step 1 -> BUILD SEARCH QUERY
+    if request.history:
+        last_user_message = next(
+            (m.content for m in reversed(request.history) if m.role == "user"),
+            ""
+        )
+        search_query = f"{last_user_message} {request.question}"
+    else:
+        search_query = request.question
+
+    # step 2 -> RETRIEVE
+    results = collection.query(
+        query_texts=[search_query],
+        n_results=10
+    )
+
+    context = "\n\n".join(results["documents"][0])
+    sources = list(set(r["source"] for r in results["metadatas"][0]))
+
+    # step 3 -> BUILD SYSTEM PROMPT
+    system_prompt = f"""You are Clio, a personal history research assistant.
+Answer questions based on the context provided from the user's personal history notes and documents.
+If the answer is not in the context, say so honestly.
+
+Context from knowledge base:
+{context}"""
+    
+    # step 4 -> BUILD MESSAGES ARRAY
+    messages = [{"role": m.role, "content": m.content} for m in request.history]
+    messages.append({"role": "user", "content": request.question})
+
+    # step 5 -> STREAM
+    # generator function that yields tokens as they arrive from Claude
+    def generate():
+        full_answer = ""
+
+        with anthropic_client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1000,
+            system=system_prompt,
+            messages=messages
+        ) as stream:
+            for text in stream.text_stream:
+                full_answer += text
+                yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+        
+        # after streaming completes, send sources and updated history
+        updated_history = list(request.history) + [
+            {"role": "user", "content": request.question},
+            {"role": "assistant", "content": full_answer}
+        ]
+
+        yield f"data: {json.dumps({'type': 'done', 'sources': sources, 'history': updated_history})}\n\n"
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")

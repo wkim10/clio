@@ -291,19 +291,63 @@
         document.getElementById("loading").style.display = "block";
         document.getElementById("askBtn").disabled = true;
 
+        // create an empty Clio message bubble to stream into
+        const chat = document.getElementById("chat");
+        const message = document.createElement("div");
+        message.className = "message clio-message";
+        const label = document.createElement("div");
+        label.className = "message-label";
+        label.textContent = "Clio";
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble";
+        bubble.innerHTML = "";
+        message.appendChild(label);
+        message.appendChild(bubble);
+        chat.appendChild(message);
+
+        let fullAnswer = "";
+
         try {
-          const res = await fetch("/query", {
+          const res = await fetch("/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ question, history: conversationHistory }),
           });
 
-          const data = await res.json();
-          conversationHistory = data.history;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
 
-          appendMessage("assistant", data.answer, data.sources);
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split("\n");
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === "token") {
+                  // append token to full answer and re-render markdown
+                  fullAnswer += data.text;
+                  bubble.innerHTML = marked.parse(fullAnswer);
+                  chat.scrollIntoView({ behavior: "smooth", block: "end" });
+                } else if (data.type === "done") {
+                  // update conversation history
+                  conversationHistory = data.history;
+
+                  // add sources below the bubble
+                  const sourcesDiv = document.createElement("div");
+                  sourcesDiv.className = "sources";
+                  sourcesDiv.innerHTML = `<span>Sources</span><ul>${data.sources.map((s) => `<li>${s.split("/").pop()}</li>`).join("")}</ul>`;
+                  message.appendChild(sourcesDiv);
+                }
+              }
+            }
+          }
         } catch (err) {
-          appendMessage("assistant", "Error: " + err.message);
+          bubble.textContent = "Error: " + err.message;
         } finally {
           document.getElementById("loading").style.display = "none";
           document.getElementById("askBtn").disabled = false;
