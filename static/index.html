@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js"></script>
     <title>Clio</title>
     <style>
       * {
@@ -247,6 +248,31 @@
     <script>
       let conversationHistory = [];
 
+      // true while a response is streaming -> blocks a second send via the Enter key
+      let isStreaming = false;
+
+      // sanitize marked's output -> the answer (and the notes it quotes) could contain raw HTML
+      function renderMarkdown(text) {
+        return DOMPurify.sanitize(marked.parse(text));
+      }
+
+      // build the sources list with textContent so file names are never parsed as HTML
+      function renderSources(sources) {
+        const sourcesDiv = document.createElement("div");
+        sourcesDiv.className = "sources";
+        const heading = document.createElement("span");
+        heading.textContent = "Sources";
+        const list = document.createElement("ul");
+        for (const s of sources) {
+          const item = document.createElement("li");
+          item.textContent = s.split("/").pop();
+          list.appendChild(item);
+        }
+        sourcesDiv.appendChild(heading);
+        sourcesDiv.appendChild(list);
+        return sourcesDiv;
+      }
+
       function appendMessage(role, content, sources = []) {
         const chat = document.getElementById("chat");
 
@@ -263,17 +289,14 @@
         if (role === "user") {
           bubble.textContent = content;
         } else {
-          bubble.innerHTML = marked.parse(content);
+          bubble.innerHTML = renderMarkdown(content);
         }
 
         message.appendChild(label);
         message.appendChild(bubble);
 
         if (sources.length > 0) {
-          const sourcesDiv = document.createElement("div");
-          sourcesDiv.className = "sources";
-          sourcesDiv.innerHTML = `<span>Sources</span><ul>${sources.map((s) => `<li>${s.split("/").pop()}</li>`).join("")}</ul>`;
-          message.appendChild(sourcesDiv);
+          message.appendChild(renderSources(sources));
         }
 
         chat.appendChild(message);
@@ -282,7 +305,8 @@
 
       async function ask() {
         const question = document.getElementById("question").value.trim();
-        if (!question) return;
+        if (!question || isStreaming) return;
+        isStreaming = true;
 
         // show user message immediately
         appendMessage("user", question);
@@ -314,6 +338,12 @@
             body: JSON.stringify({ question, history: conversationHistory }),
           });
 
+          // error responses (e.g. 422, 500) have no data: lines -> surface them instead of leaving an empty bubble
+          if (!res.ok) {
+            const detail = await res.text();
+            throw new Error(`${res.status} ${res.statusText}${detail ? ` - ${detail}` : ""}`);
+          }
+
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
 
@@ -340,17 +370,14 @@
                 if (data.type === "token") {
                   // append token to full answer and re-render markdown
                   fullAnswer += data.text;
-                  bubble.innerHTML = marked.parse(fullAnswer);
+                  bubble.innerHTML = renderMarkdown(fullAnswer);
                   chat.scrollIntoView({ behavior: "smooth", block: "end" });
                 } else if (data.type === "done") {
                   // update conversation history
                   conversationHistory = data.history;
 
                   // add sources below the bubble
-                  const sourcesDiv = document.createElement("div");
-                  sourcesDiv.className = "sources";
-                  sourcesDiv.innerHTML = `<span>Sources</span><ul>${data.sources.map((s) => `<li>${s.split("/").pop()}</li>`).join("")}</ul>`;
-                  message.appendChild(sourcesDiv);
+                  message.appendChild(renderSources(data.sources));
                 }
               }
             }
@@ -360,6 +387,7 @@
         } catch (err) {
           bubble.textContent = "Error: " + err.message;
         } finally {
+          isStreaming = false;
           document.getElementById("loading").style.display = "none";
           document.getElementById("askBtn").disabled = false;
         }
