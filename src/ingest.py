@@ -12,8 +12,7 @@ load_dotenv()
 # so embeddings are saved between runs and don't need to be recomputed
 client = chromadb.PersistentClient(path="./chroma_db")
 
-# get or create a collection called "clio"
-collection = client.get_or_create_collection("clio")
+COLLECTION_NAME = "clio"
 
 def extract_text_from_docx(path):
     """Extract raw text from a .docx Word document."""
@@ -51,7 +50,7 @@ def chunk_text(text, chunk_size=500, overlap=50):
             chunks.append(chunk)
     return chunks
 
-def ingest_file(path):
+def ingest_file(collection, path, data_path):
     """
     Extract text from a single file, chunk it, and store in ChromaDB.
 
@@ -77,13 +76,16 @@ def ingest_file(path):
     
     chunks = chunk_text(text)
 
-    for i, chunk in enumerate(chunks):
-        collection.add(
-            documents=[chunk],  # the text chunk
-            metadatas=[{"source": str(path), "chunk": i}],  # where it came from
-            ids=[f"{path.stem}_{i}"]  # unique ID for this chunk
-        )
-    
+    # use the path relative to data/ in IDs -> same-named files in different folders would otherwise collide
+    relative_path = path.relative_to(data_path).as_posix()
+
+    # add all chunks from this file in a single batched call
+    collection.add(
+        documents=chunks,
+        metadatas=[{"source": str(path), "chunk": i} for i in range(len(chunks))],
+        ids=[f"{relative_path}::{i}" for i in range(len(chunks))]
+    )
+
     return len(chunks)
 
 def ingest_directory(data_dir):
@@ -95,6 +97,11 @@ def ingest_directory(data_dir):
     """
     data_path = Path(data_dir)
 
+    # rebuild the collection from scratch so chunks from deleted or renamed files don't linger
+    if COLLECTION_NAME in [c.name for c in client.list_collections()]:
+        client.delete_collection(COLLECTION_NAME)
+    collection = client.create_collection(COLLECTION_NAME)
+
     # rglob recursively finds all matching files in all subdirectories
     files = list(data_path.rglob("*.docx")) + list(data_path.rglob("*.pdf"))
 
@@ -105,7 +112,7 @@ def ingest_directory(data_dir):
             continue
 
         print(f"Ingesting: {file.name}")
-        chunks = ingest_file(file)
+        chunks = ingest_file(collection, file, data_path)
         total_chunks += chunks
         print(f"  -> {chunks} chunks")
     
