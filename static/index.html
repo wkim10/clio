@@ -317,12 +317,21 @@
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
 
+          // holds a partial line when a network read ends mid-line
+          let buffer = "";
+
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
+            // stream: true keeps multi-byte characters (e.g. 唐) intact across reads
+            buffer += done
+              ? decoder.decode()
+              : decoder.decode(value, { stream: true });
+
+            const lines = buffer.split("\n");
+
+            // keep the incomplete last line for the next read
+            buffer = done ? "" : lines.pop();
 
             for (const line of lines) {
               if (line.startsWith("data: ")) {
@@ -345,6 +354,8 @@
                 }
               }
             }
+
+            if (done) break;
           }
         } catch (err) {
           bubble.textContent = "Error: " + err.message;
