@@ -2,3 +2,5 @@ data/
 .venv/
 .env
 chroma_db/
+.DS_Store
+__pycache__/
