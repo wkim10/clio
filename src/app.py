@@ -184,7 +184,8 @@ Context from knowledge base:
                 yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
         
         # after streaming completes, send sources and updated history
-        updated_history = list(request.history) + [
+        # model_dump() converts Message objects to dicts -> json.dumps can't serialize pydantic models
+        updated_history = [m.model_dump() for m in request.history] + [
             {"role": "user", "content": request.question},
             {"role": "assistant", "content": full_answer}
         ]
