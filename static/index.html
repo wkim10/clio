@@ -225,6 +225,12 @@
         padding: 8px;
         display: none;
       }
+
+      .error-note {
+        margin-top: 8px;
+        font-size: 0.85rem;
+        color: #b3261e;
+      }
     </style>
   </head>
   <body>
@@ -257,6 +263,27 @@
 
       // true while a response is streaming -> blocks a second send via the Enter key
       let isStreaming = false;
+
+      // aborts the in-flight request -> New Conversation cancels it so it can't write into the new conversation
+      let currentController = null;
+
+      // true when the reader is at (or close to) the bottom of the page
+      function isNearBottom() {
+        return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 80;
+      }
+
+      // jump straight to the bottom -> a smooth scroll per token restarts the animation and jitters
+      function scrollToBottom() {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+      }
+
+      // resets the page back to "ready for a question" after a request finishes or is cancelled
+      function setIdle() {
+        isStreaming = false;
+        currentController = null;
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("askBtn").disabled = false;
+      }
 
       // sanitize marked's output -> the answer (and the notes it quotes) could contain raw HTML
       function renderMarkdown(text) {
@@ -307,13 +334,16 @@
         }
 
         chat.appendChild(message);
-        chat.scrollIntoView({ behavior: "smooth", block: "end" });
+        scrollToBottom();
       }
 
       async function ask() {
         const question = document.getElementById("question").value.trim();
         if (!question || isStreaming) return;
         isStreaming = true;
+
+        const controller = new AbortController();
+        currentController = controller;
 
         // show user message immediately
         appendMessage("user", question);
@@ -337,12 +367,14 @@
         chat.appendChild(message);
 
         let fullAnswer = "";
+        let receivedDone = false;
 
         try {
           const res = await fetch("/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ question, history: conversationHistory }),
+            signal: controller.signal,
           });
 
           // error responses (e.g. 422, 500) have no data: lines -> surface them instead of leaving an empty bubble
@@ -374,33 +406,62 @@
               if (line.startsWith("data: ")) {
                 const data = JSON.parse(line.slice(6));
 
+                // check before rendering -> once the new text is added the page is taller
+                const follow = isNearBottom();
+
                 if (data.type === "token") {
                   // append token to full answer and re-render markdown
                   fullAnswer += data.text;
                   bubble.innerHTML = renderMarkdown(fullAnswer);
-                  chat.scrollIntoView({ behavior: "smooth", block: "end" });
                 } else if (data.type === "done") {
+                  receivedDone = true;
+
                   // update conversation history
                   conversationHistory = data.history;
 
                   // add sources below the bubble
                   message.appendChild(renderSources(data.sources));
                 }
+
+                // only follow the stream if the reader hasn't scrolled up to read something else
+                if (follow) scrollToBottom();
               }
             }
 
             if (done) break;
           }
+
+          // the server always ends with a done event -> without it the answer was cut off
+          // and the history wasn't updated
+          if (!receivedDone) {
+            throw new Error("The response was cut off before it finished");
+          }
         } catch (err) {
-          bubble.textContent = "Error: " + err.message;
+          // cancelled by New Conversation -> the message is already gone, nothing to show
+          if (err.name === "AbortError") return;
+
+          if (fullAnswer) {
+            // keep the partial answer and add the error below it
+            const note = document.createElement("div");
+            note.className = "error-note";
+            note.textContent = `Error: ${err.message}. This answer won't be included in the conversation history.`;
+            message.appendChild(note);
+          } else {
+            bubble.textContent = "Error: " + err.message;
+          }
         } finally {
-          isStreaming = false;
-          document.getElementById("loading").style.display = "none";
-          document.getElementById("askBtn").disabled = false;
+          // skip if New Conversation already cancelled this request and reset the page
+          if (currentController === controller) setIdle();
         }
       }
 
       function newConversation() {
+        // cancel any answer still streaming -> otherwise its done event would bring back the old history
+        if (currentController) {
+          currentController.abort();
+          setIdle();
+        }
+
         conversationHistory = [];
         document.getElementById("question").value = "";
         document.getElementById("chat").innerHTML = "";
