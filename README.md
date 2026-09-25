@@ -58,6 +58,8 @@ Personal notes + essays + course documents
 
 - **ChromaDB** — local persistent vector database with built-in embeddings
 - **Anthropic API (Claude Haiku)** — LLM for answer generation
+- **FastAPI + uvicorn** — web server, streaming answers to the browser over Server-Sent Events (SSE)
+- **marked + DOMPurify** — markdown rendering in the chat UI, sanitized before it reaches the page
 - **pypdf** — PDF text extraction
 - **docx2txt** — Word document text extraction
 - **python-dotenv** — environment variable management
@@ -68,16 +70,23 @@ To run Clio with your own documents, replace the contents of the `data/` folder 
 
 Prerequisites: Python 3.11 or earlier (Python 3.13 has torch compatibility issues)
 
+Clone the repo:
+
 ```bash
-# clone the repo
 git clone https://github.com/wkim10/clio.git
 cd clio
+```
 
-# create virtual environment
+Create a virtual environment:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
 
-# install dependencies
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
