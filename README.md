@@ -8,6 +8,8 @@ Clio is a personal history knowledge base and research assistant powered by RAG 
 
 Ask Clio questions about history and it answers using **your own notes and documents** as the source of truth, not generic internet knowledge. It retrieves the most relevant passages from your personal knowledge base and passes them to Claude to generate a grounded, cited response.
 
+**Citations:** every retrieved passage is labeled with a numbered source before it goes to Claude, and Claude cites those numbers inline, like "The Tang dynasty was founded in 618 [2]." Each answer ends with a numbered list of sources, so `[2]` always points to a specific file in your notes. Passages from the same file share a number.
+
 **Example queries:**
 
 - "What were the main causes of the fall of the Roman Republic?"
@@ -47,9 +49,9 @@ Personal notes + essays + course documents
              ↓
     Stored in persistent ChromaDB vector database
              ↓
-    Query → retrieve top 5 relevant chunks → pass to Claude
+    Query → retrieve top 10 relevant chunks → pass to Claude
              ↓
-    Grounded answer with source citations
+    Grounded answer with numbered source citations
 ```
 
 ## Tech Stack
@@ -76,8 +78,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # install dependencies
-pip install chromadb anthropic python-dotenv pypdf docx2txt
+pip install -r requirements.txt
 ```
+
+This installs ChromaDB, the Anthropic SDK, FastAPI, uvicorn, pypdf, docx2txt, and python-dotenv.
 
 Add your Anthropic API key:
 
@@ -101,7 +105,15 @@ Ingest your documents:
 python src/ingest.py
 ```
 
-Query Clio:
+Start the web app from the repo root:
+
+```bash
+uvicorn src.app:app --reload
+```
+
+Then open [http://localhost:8000](http://localhost:8000) and start asking questions.
+
+Or query Clio from the command line:
 
 ```bash
 python src/query.py
@@ -112,11 +124,15 @@ python src/query.py
 ```
 clio/
 ├── src/
-│   ├── ingest.py    # document ingestion pipeline
-│   └── query.py     # RAG query interface
-├── data/            # personal documents (gitignored)
-├── chroma_db/       # vector database (gitignored)
-├── .env             # API keys (gitignored)
+│   ├── app.py            # FastAPI web server with streaming responses
+│   ├── ingest.py         # document ingestion pipeline
+│   └── query.py          # shared retrieval and prompt code + command-line interface
+├── static/
+│   └── index.html        # chat UI
+├── data/                 # personal documents (gitignored)
+├── chroma_db/            # vector database (gitignored)
+├── .env                  # API keys (gitignored)
+├── requirements.txt
 └── README.md
 ```
 
