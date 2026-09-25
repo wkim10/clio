@@ -135,8 +135,9 @@
         letter-spacing: 0.5px;
       }
 
-      .sources ul {
+      .sources ol {
         list-style: none;
+        counter-reset: source;
         margin-top: 4px;
         display: flex;
         flex-direction: column;
@@ -146,6 +147,12 @@
       .sources li {
         font-family: monospace;
         font-size: 0.78rem;
+        counter-increment: source;
+      }
+
+      /* number sources as [1], [2], ... to match the inline citations in the answer */
+      .sources li::before {
+        content: "[" counter(source) "] ";
       }
 
       .input-container {
@@ -262,7 +269,7 @@
         sourcesDiv.className = "sources";
         const heading = document.createElement("span");
         heading.textContent = "Sources";
-        const list = document.createElement("ul");
+        const list = document.createElement("ol");
         for (const s of sources) {
           const item = document.createElement("li");
           item.textContent = s.split("/").pop();
